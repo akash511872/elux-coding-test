@@ -36,47 +36,28 @@ class ProductService {
         products
     }
     
-    fun applyDiscount(productId: String, discountId: String, percent: Double): Result<ProductResponse> = transaction {
-        try {
-            // Check if product exists
-            val productRow = Products.select { Products.id eq productId }.singleOrNull()
-                ?: return@transaction Result.failure(Exception("Product not found"))
-            
-            // Try to insert the discount - will fail if already exists due to unique constraint
-            Discounts.insert {
-                it[Discounts.productId] = productId
-                it[Discounts.discountId] = discountId
-                it[Discounts.percent] = percent
-            }
-            
-            // Fetch updated product with all discounts
-            val discounts = getDiscountsForProduct(productId)
-            val totalDiscountPercent = discounts.sumOf { it.percent }
-            val country = productRow[Products.country]
-            val vatRate = VATCalculator.getVATRate(country)
-            val finalPrice = VATCalculator.calculateFinalPrice(
-                productRow[Products.basePrice],
-                totalDiscountPercent,
-                vatRate
-            )
-            
-            Result.success(ProductResponse(
-                id = productId,
-                name = productRow[Products.name],
-                basePrice = productRow[Products.basePrice],
-                country = country,
-                discounts = discounts,
-                finalPrice = finalPrice
-            ))
-        } catch (e: ExposedSQLException) {
-            // Check if it's a unique constraint violation (discount already applied)
-            // For PostgreSQL: message contains "unique_product_discount"
-            // For H2: message contains "Unique index or primary key violation"
-            if (e.message?.contains("unique_product_discount") == true || 
-                e.message?.contains("Unique index") == true ||
-                e.message?.contains("UNIQUE") == true) {
-                // Return current state - idempotent behavior
-                val productRow = Products.select { Products.id eq productId }.single()
+    fun applyDiscount(productId: String, discountId: String, percent: Double): Result<ProductResponse> {
+        return try {
+            transaction {
+                // Check if product exists
+                val productRow = Products.select { Products.id eq productId }.singleOrNull()
+                    ?: return@transaction Result.failure(Exception("Product not found"))
+                
+                // Check if discount already exists (for idempotency)
+                val existingDiscount = Discounts.select { 
+                    (Discounts.productId eq productId) and (Discounts.discountId eq discountId)
+                }.singleOrNull()
+                
+                // Only insert if doesn't exist
+                if (existingDiscount == null) {
+                    Discounts.insert {
+                        it[Discounts.productId] = productId
+                        it[Discounts.discountId] = discountId
+                        it[Discounts.percent] = percent
+                    }
+                }
+                
+                // Fetch updated product with all discounts
                 val discounts = getDiscountsForProduct(productId)
                 val totalDiscountPercent = discounts.sumOf { it.percent }
                 val country = productRow[Products.country]
@@ -95,9 +76,9 @@ class ProductService {
                     discounts = discounts,
                     finalPrice = finalPrice
                 ))
-            } else {
-                Result.failure(e)
             }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
     

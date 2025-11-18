@@ -43,6 +43,16 @@ fun Application.module() {
     // Initialize database
     DatabaseFactory.init(jdbcUrl, driver, user, password, maxPoolSize)
     
+    val productService = ProductService()
+    
+    // Seed initial data (only creates if doesn't exist)
+    try {
+        DataSeeder.seedProducts(productService)
+        log.info("Sample products initialized")
+    } catch (e: Exception) {
+        log.warn("Could not seed products: ${e.message}")
+    }
+    
     // Configure JSON serialization
     install(ContentNegotiation) {
         json(Json {
@@ -59,8 +69,6 @@ fun Application.module() {
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (cause.message ?: "Unknown error")))
         }
     }
-    
-    val productService = ProductService()
     
     routing {
         get("/") {

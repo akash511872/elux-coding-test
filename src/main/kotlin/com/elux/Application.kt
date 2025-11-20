@@ -29,14 +29,18 @@ fun Application.module() {
     val jdbcUrl = config.propertyOrNull("database.jdbcUrl")?.getString() 
         ?: System.getenv("DATABASE_URL") 
         ?: "jdbc:postgresql://localhost:5432/elux_products"
+
     val driver = config.propertyOrNull("database.driver")?.getString() 
         ?: "org.postgresql.Driver"
+
     val user = config.propertyOrNull("database.user")?.getString() 
         ?: System.getenv("DATABASE_USER") 
         ?: "elux_user"
+
     val password = config.propertyOrNull("database.password")?.getString() 
         ?: System.getenv("DATABASE_PASSWORD") 
         ?: "elux_pass"
+
     val maxPoolSize = config.propertyOrNull("database.maxPoolSize")?.getString()?.toIntOrNull() 
         ?: 10
     

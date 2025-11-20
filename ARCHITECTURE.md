@@ -9,6 +9,7 @@ This document describes the architecture, design decisions, and implementation d
 ### High-Level Components
 
 ```mermaid
+
 graph TB
     Client[HTTP Client]
     API[Ktor API Server]
